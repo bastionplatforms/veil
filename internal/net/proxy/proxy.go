@@ -24,9 +24,9 @@ func TunToVSOCK(
 	defer func() { _ = to.Close() }()
 	defer wg.Done()
 	var (
-		err       error
-		pktLenBuf = make([]byte, lenBufSize)
-		pktBuf    = make([]byte, tun.MTU)
+		err      error
+		pktBuf   = make([]byte, tun.MTU)
+		writeBuf = make([]byte, lenBufSize+tun.MTU)
 	)
 
 	for {
@@ -34,8 +34,9 @@ func TunToVSOCK(
 		nr, rerr := from.Read(pktBuf)
 		if nr > 0 {
 			// Forward the network packet to our TCP-over-VSOCK connection.
-			binary.BigEndian.PutUint16(pktLenBuf, uint16(nr))
-			if _, werr := to.Write(append(pktLenBuf, pktBuf[:nr]...)); werr != nil {
+			binary.BigEndian.PutUint16(writeBuf, uint16(nr))
+			copy(writeBuf[lenBufSize:], pktBuf[:nr])
+			if _, werr := to.Write(writeBuf[:lenBufSize+nr]); werr != nil {
 				err = werr
 				break
 			}
